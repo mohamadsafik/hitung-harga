@@ -78,21 +78,23 @@
           <div class="flex justify-between items-center text-lg">
             <span class="font-medium text-gray-700">Total Sebelum Diskon:</span>
             <span id="grandTotalBeforeDiscount" class="font-bold text-gray-900"
-              >Rp 0.00</span
+              >Rp 0</span
             >
           </div>
           <div class="flex justify-between items-center text-lg">
-            <span class="font-medium text-gray-700">Total Diskon:</span>
-            <span id="grandTotalDiscount" class="font-bold text-gray-900"
-              >Rp 0.00</span
+            <span class="font-medium text-yellow-500">Total Diskon:</span>
+            <span id="grandTotalDiscount" class="font-bold text-yellow-500"
+              >Rp 0</span
             >
           </div>
           <div
             class="flex justify-between items-center text-xl border-t pt-3 border-gray-300"
           >
-            <span class="font-medium text-gray-700">Total Setelah Diskon:</span>
+            <span class="font-medium text-green-800"
+              >Total Setelah Diskon:</span
+            >
             <span id="grandTotalAfterDiscount" class="font-bold text-green-700"
-              >Rp 0.00</span
+              >Rp 0</span
             >
           </div>
         </div>
@@ -523,7 +525,7 @@
         grandTotalAfterDiscountSpan.textContent = formatCurrency(
           totalAfterAllDiscounts
         );
-        grandTotalDiscount.textContent = formatCurrency(totalDiscount); // Removed "-" as it's already a positive discount amount
+        grandTotalDiscount.textContent = "-" + formatCurrency(totalDiscount); // Removed "-" as it's already a positive discount amount
       }
 
       /**
