@@ -28,6 +28,12 @@
         background: #64748b; /* Darker on hover */
       }
     </style>
+    <!-- jsPDF CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- jsPDF AutoTable Plugin CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- Moment.js CDN (NEWLY ADDED) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
   </head>
   <body class="p-4 sm:p-6 lg:p-8">
     <div class="max-w-12xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow-2xl">
@@ -91,6 +97,59 @@
           </div>
         </div>
       </div>
+
+      <!-- Tombol Export -->
+      <div class="flex justify-center mt-8">
+        <div class="relative inline-block text-left">
+          <button
+            type="button"
+            id="exportDropdownBtn"
+            class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            aria-haspopup="true"
+            aria-expanded="true"
+          >
+            Export Data
+            <svg
+              class="-mr-1 ml-2 h-5 w-5"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </button>
+
+          <div
+            id="exportDropdownMenu"
+            class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden"
+            role="menu"
+            aria-orientation="vertical"
+            aria-labelledby="exportDropdownBtn"
+          >
+            <div class="py-1" role="none">
+              <a
+                href="#"
+                id="exportExcelBtn"
+                class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100"
+                role="menuitem"
+                >Export Excel (.xls)</a
+              >
+              <a
+                href="#"
+                id="exportPdfBtn"
+                class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100"
+                role="menuitem"
+                >Export PDF</a
+              >
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Custom Alert Modal -->
@@ -113,6 +172,9 @@
     </div>
 
     <script>
+      // Pastikan window.jspdf tersedia setelah CDN dimuat
+      const { jsPDF } = window.jspdf;
+
       let rowCounter = 0; // Untuk ID unik setiap baris
       const itemRowsContainer = document.getElementById("itemRowsContainer");
       const addRowBtn = document.getElementById("addRowBtn");
@@ -130,6 +192,12 @@
       const customAlertCloseBtn = document.getElementById(
         "customAlertCloseBtn"
       );
+
+      // Export Dropdown Elements
+      const exportDropdownBtn = document.getElementById("exportDropdownBtn");
+      const exportDropdownMenu = document.getElementById("exportDropdownMenu");
+      const exportExcelBtn = document.getElementById("exportExcelBtn");
+      const exportPdfBtn = document.getElementById("exportPdfBtn");
 
       /**
        * Menampilkan pesan peringatan kustom.
@@ -364,7 +432,7 @@
         );
         const priceTotalDiscountSpan = rowElement.querySelector(
           ".price-total-discount"
-        ); // Added this line
+        );
         const priceAfterDiscountSpan = rowElement.querySelector(
           ".price-after-discount"
         );
@@ -426,7 +494,7 @@
       function updateGrandTotals() {
         let totalBeforeAllDiscounts = 0;
         let totalAfterAllDiscounts = 0;
-        let totalDiscount = 0; // Added this line
+        let totalDiscount = 0;
 
         document.querySelectorAll(".item-row").forEach((rowElement) => {
           const totalBeforeDiscountText = rowElement.querySelector(
@@ -437,16 +505,16 @@
           ).textContent;
           const totalDiscountText = rowElement.querySelector(
             ".price-total-discount"
-          ).textContent; // Added this line
+          ).textContent;
 
           // Gunakan cleanCurrency untuk mengekstrak angka dari string mata uang
           const beforeValue = cleanCurrency(totalBeforeDiscountText);
           const afterValue = cleanCurrency(totalAfterDiscountText);
-          const totalDiscountValue = cleanCurrency(totalDiscountText); // Added this line
+          const totalDiscountValue = cleanCurrency(totalDiscountText);
 
           totalBeforeAllDiscounts += beforeValue;
           totalAfterAllDiscounts += afterValue;
-          totalDiscount += totalDiscountValue; // Accumulate total discount
+          totalDiscount += totalDiscountValue;
         });
 
         grandTotalBeforeDiscountSpan.textContent = formatCurrency(
@@ -455,12 +523,262 @@
         grandTotalAfterDiscountSpan.textContent = formatCurrency(
           totalAfterAllDiscounts
         );
-        grandTotalDiscount.textContent = "-" + formatCurrency(totalDiscount); // Update grand total discount
+        grandTotalDiscount.textContent = formatCurrency(totalDiscount); // Removed "-" as it's already a positive discount amount
+      }
+
+      /**
+       * Mengumpulkan semua data item dari DOM untuk export.
+       * @returns {Array<Object>} Array objek yang berisi data setiap item.
+       */
+      function collectItemData() {
+        const items = [];
+        document.querySelectorAll(".item-row").forEach((rowElement) => {
+          const itemName =
+            rowElement.querySelector(".item-name").value || "Nama Barang";
+          const quantity =
+            parseFloat(rowElement.querySelector(".item-quantity").value) || 0;
+          const price = cleanCurrency(
+            rowElement.querySelector(".item-price").value
+          );
+          const discountType = rowElement.querySelector(".discount-type").value;
+          const discountValue =
+            parseFloat(rowElement.querySelector(".discount-value").value) || 0;
+          const priceBeforeDiscount = cleanCurrency(
+            rowElement.querySelector(".price-before-discount").textContent
+          );
+          const priceTotalDiscount = cleanCurrency(
+            rowElement.querySelector(".price-total-discount").textContent
+          );
+          const priceAfterDiscount = cleanCurrency(
+            rowElement.querySelector(".price-after-discount").textContent
+          );
+
+          items.push({
+            itemName,
+            quantity,
+            price,
+            discountType,
+            discountValue,
+            priceBeforeDiscount,
+            priceTotalDiscount,
+            priceAfterDiscount,
+          });
+        });
+        return items;
+      }
+
+      /**
+       * Memicu export data ke format tertentu (CSV, Excel, PDF).
+       * @param {string} format - Format export ('csv', 'excel', 'pdf').
+       */
+      function triggerExport(format) {
+        const items = collectItemData();
+        if (
+          items.length === 0 ||
+          (items.length === 1 && items[0].priceBeforeDiscount === 0)
+        ) {
+          showCustomAlert(
+            "Tidak ada data untuk diexport. Mohon masukkan data barang terlebih dahulu."
+          );
+          return;
+        }
+
+        const fileName = `Laporan_Harga_Barang_${moment().format(
+          "YYYYMMDD_HHmmss"
+        )}`;
+
+        if (format === "excel") {
+          exportExcel(items, fileName);
+        } else if (format === "pdf") {
+          exportPdf(items, fileName);
+        } else {
+          showCustomAlert("Format export tidak valid.");
+        }
+      }
+
+      /**
+       * Mengkonversi array of objects menjadi string CSV dengan ekstensi .xls agar mudah dibuka Excel.
+       * @param {Array<Object>} data - Data yang akan dikonversi.
+       * @param {string} fileName - Nama file tanpa ekstensi.
+       */
+      function exportExcel(data, fileName) {
+        // Untuk export Excel (.xls), kita akan membuat CSV yang kompatibel dengan Excel
+        // Jika Anda membutuhkan .xlsx asli, Anda perlu menggunakan library seperti SheetJS.
+        const headers = [
+          "No.",
+          "Nama Barang",
+          "Jumlah",
+          "Harga Satuan",
+          "Tipe Diskon",
+          "Nilai Diskon",
+          "Harga Sebelum Diskon",
+          "Total Diskon",
+          "Harga Setelah Diskon",
+        ];
+        let csvContent = headers.join("\t") + "\n"; // Gunakan tab sebagai pemisah untuk Excel
+
+        data.forEach((item, index) => {
+          const row = [
+            // Memaksa interpretasi teks untuk semua kolom numerik dengan menambahkan kutip tunggal di awal
+            `'${index + 1}`, // No.
+            item.itemName,
+            `'${item.quantity}`, // Jumlah
+            `'${formatCurrency(item.price)}`, // Harga Satuan (difomart)
+            item.discountType,
+            // Nilai Diskon - format berdasarkan tipe, lalu paksa teks
+            item.discountType === "percentage"
+              ? `'${item.discountValue}%`
+              : `'${formatCurrency(item.discountValue)}`,
+            `'${formatCurrency(item.priceBeforeDiscount)}`, // Harga Sebelum Diskon (difomart)
+            `'${formatCurrency(item.priceTotalDiscount)}`, // Total Diskon (difomart)
+            `'${formatCurrency(item.priceAfterDiscount)}`, // Harga Setelah Diskon (difomart)
+          ];
+          // Tidak perlu escaping koma jika pemisahnya tab, tapi tetap escape kutip ganda
+          const escapedRow = row.map((field) => {
+            // Pastikan field diperlakukan sebagai string sebelum memeriksa kutip
+            const stringField = String(field);
+            if (stringField.includes('"')) {
+              return `"${stringField.replace(/"/g, '""')}"`;
+            }
+            return stringField; // Kembalikan sebagai string
+          });
+          csvContent += escapedRow.join("\t") + "\n";
+        });
+        downloadFile(csvContent, `${fileName}.xls`, "application/vnd.ms-excel");
+      }
+
+      /**
+       * Mengumpulkan semua data item dari DOM untuk export PDF.
+       * @param {Array<Object>} items - Data item yang sudah dikumpulkan.
+       * @param {string} fileName - Nama file tanpa ekstensi.
+       */
+      function exportPdf(items, fileName) {
+        const doc = new jsPDF();
+
+        // Judul Dokumen
+        doc.setFontSize(18);
+
+        doc.text("Laporan Harga Barang", 14, 22);
+
+        // Kolom untuk tabel
+        const head = [
+          [
+            "No.",
+            "Nama Barang",
+            "Jumlah",
+            "Harga Satuan",
+            "Tipe Diskon",
+            "Nilai Diskon",
+            "Harga Sblm Diskon",
+            "Total Diskon",
+            "Harga Stlh Diskon",
+          ],
+        ];
+
+        // Data untuk tabel
+        const body = items.map((item, index) => [
+          index + 1,
+          item.itemName,
+          item.quantity,
+          formatCurrency(item.price), // Format harga satuan
+          item.discountType,
+          item.discountType === "percentage"
+            ? `${item.discountValue}%`
+            : formatCurrency(item.discountValue), // Display actual value for fixed
+          formatCurrency(item.priceBeforeDiscount),
+          formatCurrency(item.priceTotalDiscount),
+          formatCurrency(item.priceAfterDiscount),
+        ]);
+
+        // Menambahkan tabel ke PDF
+        doc.autoTable({
+          head: head,
+          body: body,
+          startY: 30,
+          theme: "striped",
+          headStyles: { fillColor: [48, 62, 84] }, // Tailwind's gray-800 equivalent
+          styles: {
+            fontSize: 8,
+            cellPadding: 2,
+            halign: "center", // Default alignment for cells
+          },
+          columnStyles: {
+            // Specific alignment for price columns
+            3: { halign: "right" }, // Harga Satuan
+            5: { halign: "right" }, // Nilai Diskon
+            6: { halign: "right" }, // Harga Sebelum Diskon
+            7: { halign: "right" }, // Total Diskon
+            8: { halign: "right" }, // Harga Setelah Diskon
+          },
+          didParseCell: function (data) {
+            // Adjust column width for specific columns if needed, or text overflow
+            // if (data.column.index === 1 && data.cell.raw) {
+            //   // Nama Barang
+            //   const textLines = doc.splitTextToSize(
+            //     data.cell.raw,
+            //     data.column.width -
+            //       data.cell.padding("left") -
+            //       data.cell.padding("right")
+            //   );
+            //   data.cell.text = textLines;
+            // }
+          },
+        });
+
+        // Menambahkan ringkasan total di bawah tabel
+        let finalY = doc.autoTable.previous.finalY; // Posisi Y setelah tabel
+        doc.setFontSize(12);
+        doc.text("Ringkasan Total:", 14, finalY + 10);
+        doc.setFontSize(10);
+        doc.text(
+          `Total Sebelum Diskon: ${grandTotalBeforeDiscountSpan.textContent}`,
+          14,
+          finalY + 18
+        );
+        doc.text(
+          `Total Diskon: ${grandTotalDiscount.textContent}`,
+          14,
+          finalY + 24
+        );
+        doc.text(
+          `Total Setelah Diskon: ${grandTotalAfterDiscountSpan.textContent}`,
+          14,
+          finalY + 30
+        );
+
+        doc.save(`${fileName}.pdf`);
+      }
+
+      /**
+       * Memicu download file di browser.
+       * @param {string} content - Konten file.
+       * @param {string} fileName - Nama file.
+       * @param {string} mimeType - MIME type file (misal 'text/csv').
+       */
+      function downloadFile(content, fileName, mimeType) {
+        const blob = new Blob([content], {
+          type: mimeType + ";charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+          // Cek apakah browser mendukung atribut download
+          const url = URL.createObjectURL(blob);
+          link.setAttribute("href", url);
+          link.setAttribute("download", fileName);
+          link.style.visibility = "hidden";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url); // Bersihkan URL objek
+        } else {
+          // Fallback untuk browser lama
+          window.open("data:" + mimeType + "," + encodeURIComponent(content));
+        }
       }
 
       // --- Inisialisasi Aplikasi ---
       document.addEventListener("DOMContentLoaded", () => {
-        // Tambahkan 3 baris default saat aplikasi dimuat
+        // Tambahkan 1 baris default saat aplikasi dimuat
         for (let i = 0; i < 1; i++) {
           addRow();
         }
@@ -468,6 +786,33 @@
 
         // Event listener untuk tombol "Tambah Barang"
         addRowBtn.addEventListener("click", addRow);
+
+        // Event listener untuk dropdown export
+        exportDropdownBtn.addEventListener("click", () => {
+          exportDropdownMenu.classList.toggle("hidden");
+        });
+
+        // Tutup dropdown jika klik di luar
+        window.addEventListener("click", function (e) {
+          if (
+            !exportDropdownBtn.contains(e.target) &&
+            !exportDropdownMenu.contains(e.target)
+          ) {
+            exportDropdownMenu.classList.add("hidden");
+          }
+        });
+
+        // Event listeners untuk tombol export di dropdown
+        exportExcelBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          triggerExport("excel");
+          exportDropdownMenu.classList.add("hidden");
+        });
+        exportPdfBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          triggerExport("pdf");
+          exportDropdownMenu.classList.add("hidden");
+        });
       });
     </script>
   </body>
