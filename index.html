@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalkulator Harga Barang</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f3f4f6; /* Light gray background */
+      }
+      /* Custom scrollbar for better aesthetics */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #e2e8f0; /* Lighter track */
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #94a3b8; /* Grayish blue thumb */
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #64748b; /* Darker on hover */
+      }
+    </style>
+  </head>
+  <body class="p-4 sm:p-6 lg:p-8">
+    <div class="max-w-12xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow-2xl">
+      <h1
+        class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-8 text-center"
+      >
+        Kalkulator Harga Barang
+      </h1>
+
+      <div id="itemRowsContainer" class="space-y-6 mb-8">
+        <!-- Item rows will be dynamically added here -->
+      </div>
+
+      <div class="flex justify-center mb-8">
+        <button
+          id="addRowBtn"
+          class="flex items-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-200"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-6 w-6 mr-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+            />
+          </svg>
+          Tambah Barang
+        </button>
+      </div>
+
+      <div
+        class="bg-gray-100 p-6 rounded-xl shadow-inner border border-gray-200"
+      >
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Ringkasan Total</h2>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center text-lg">
+            <span class="font-medium text-gray-700">Total Sebelum Diskon:</span>
+            <span id="grandTotalBeforeDiscount" class="font-bold text-gray-900"
+              >Rp 0.00</span
+            >
+          </div>
+          <div class="flex justify-between items-center text-lg">
+            <span class="font-medium text-gray-700">Total Diskon:</span>
+            <span id="grandTotalDiscount" class="font-bold text-gray-900"
+              >Rp 0.00</span
+            >
+          </div>
+          <div
+            class="flex justify-between items-center text-xl border-t pt-3 border-gray-300"
+          >
+            <span class="font-medium text-gray-700">Total Setelah Diskon:</span>
+            <span id="grandTotalAfterDiscount" class="font-bold text-green-700"
+              >Rp 0.00</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Alert Modal -->
+    <div
+      id="customAlertModal"
+      class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 hidden"
+    >
+      <div
+        class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center"
+      >
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">Peringatan!</h3>
+        <p id="customAlertMessage" class="text-gray-600 mb-6"></p>
+        <button
+          id="customAlertCloseBtn"
+          class="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+
+    <script>
+      let rowCounter = 0; // Untuk ID unik setiap baris
+      const itemRowsContainer = document.getElementById("itemRowsContainer");
+      const addRowBtn = document.getElementById("addRowBtn");
+      const grandTotalBeforeDiscountSpan = document.getElementById(
+        "grandTotalBeforeDiscount"
+      );
+      const grandTotalAfterDiscountSpan = document.getElementById(
+        "grandTotalAfterDiscount"
+      );
+      const grandTotalDiscount = document.getElementById("grandTotalDiscount");
+
+      // Custom Alert Elements
+      const customAlertModal = document.getElementById("customAlertModal");
+      const customAlertMessage = document.getElementById("customAlertMessage");
+      const customAlertCloseBtn = document.getElementById(
+        "customAlertCloseBtn"
+      );
+
+      /**
+       * Menampilkan pesan peringatan kustom.
+       * @param {string} message - Pesan yang akan ditampilkan.
+       */
+      function showCustomAlert(message) {
+        customAlertMessage.textContent = message;
+        customAlertModal.classList.remove("hidden");
+      }
+
+      // Event listener untuk menutup peringatan kustom
+      customAlertCloseBtn.addEventListener("click", () => {
+        customAlertModal.classList.add("hidden");
+      });
+
+      /**
+       * Memformat nilai numerik menjadi format mata uang Rupiah.
+       * @param {number} value - Nilai yang akan diformat.
+       * @returns {string} String format mata uang.
+       */
+      function formatCurrency(value) {
+        return new Intl.NumberFormat("id-ID", {
+          style: "currency",
+          currency: "IDR",
+          minimumFractionDigits: 0, // Set to 0 for whole numbers initially
+          maximumFractionDigits: 2,
+        }).format(value);
+      }
+
+      /**
+       * Membersihkan string mata uang menjadi nilai numerik.
+       * @param {string} currencyString - String mata uang (misal "Rp 10.000,00").
+       * @returns {number} Nilai numerik.
+       */
+      function cleanCurrency(currencyString) {
+        // Hapus "Rp", spasi, dan ganti koma desimal dengan titik
+        // Ini akan menangani format seperti "Rp 10.000" atau "10.000"
+        return (
+          parseFloat(
+            currencyString.replace(/[^0-9,-]+/g, "").replace(",", ".")
+          ) || 0
+        );
+      }
+
+      /**
+       * Memformat input numerik saat diketik untuk menampilkan ribuan separator.
+       * @param {string} value - Nilai string dari input.
+       * @returns {string} String yang sudah diformat.
+       */
+      function formatCurrencyInput(value) {
+        // Hapus semua karakter non-digit kecuali tanda koma/titik jika ada
+        let cleanValue = value.replace(/[^0-9]/g, "");
+        if (cleanValue === "") return "";
+
+        // Konversi ke angka, lalu format sebagai string IDR tanpa simbol dan desimal
+        let numberValue = parseInt(cleanValue, 10);
+        if (isNaN(numberValue)) return "";
+
+        // Gunakan Intl.NumberFormat untuk format ribuan
+        return new Intl.NumberFormat("id-ID").format(numberValue);
+      }
+
+      /**
+       * Menambahkan baris item baru ke kontainer.
+       */
+      function addRow() {
+        rowCounter++;
+        const newRow = document.createElement("div");
+        newRow.classList.add(
+          "item-row",
+          "flex",
+          "flex-wrap",
+          "items-end",
+          "gap-4",
+          "p-4",
+          "bg-white",
+          "rounded-xl",
+          "shadow-md",
+          "border",
+          "border-gray-200"
+        );
+        newRow.dataset.rowId = rowCounter; // Menyimpan ID baris
+
+        newRow.innerHTML = `
+                <!-- Nama Barang -->
+                <div class="flex-1 min-w-[150px] max-w-full sm:max-w-[calc(20%-1rem)]">
+                    <label for="itemName_${rowCounter}" class="block text-sm font-medium text-gray-700">Nama Barang</label>
+                    <input type="text" id="itemName_${rowCounter}" class="item-name mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2.5">
+                </div>
+
+                <!-- Quantity -->
+                <div class="w-24 min-w-[80px]">
+                    <label for="itemQuantity_${rowCounter}" class="block text-sm font-medium text-gray-700">Jumlah</label>
+                    <input type="number" id="itemQuantity_${rowCounter}" class="item-quantity mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2.5" value="1" min="0">
+                </div>
+
+                <!-- Price -->
+                <div class="w-32 min-w-[100px]">
+                    <label for="itemPrice_${rowCounter}" class="block text-sm font-medium text-gray-700">Harga</label>
+                    <input type="text" id="itemPrice_${rowCounter}" class="item-price mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2.5 text-right" value="0" inputmode="numeric" pattern="[0-9]*">
+                </div>
+
+                <!-- Discount Type -->
+                <div class="w-36 min-w-[120px]">
+                    <label for="discountType_${rowCounter}" class="block text-sm font-medium text-gray-700">Diskon</label>
+                    <select id="discountType_${rowCounter}" class="discount-type mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2.5 appearance-none bg-white bg-no-repeat bg-right-center pr-8" style="background-image: url('data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 20 20\' fill=\'currentColor\'%3E%3Cpath fill-rule=\'evenodd\' d=\'M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\' clip-rule=\'evenodd\' /%3E%3C/svg%3E'); background-size: 1.5rem; background-position: right 0.5rem center;">
+                        <option value="none">Tidak Ada</option>
+                        <option value="percentage">Persen (%)</option>
+                        <option value="fixed">Fixed Price</option>
+                    </select>
+                </div>
+
+                <!-- Discount Value -->
+                <div class="w-36 min-w-[120px]">
+                    <label for="discountValue_${rowCounter}" class="block text-sm font-medium text-gray-700">Nilai Diskon</label>
+                    <input type="number" id="discountValue_${rowCounter}" class="discount-value mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2.5" value="0" min="0" step="1">
+                </div>
+
+
+                <!-- Harga Sebelum Diskon -->
+                <div class="w-56 min-w-[120px]">
+                    <label class="block text-sm font-medium text-gray-700">Harga Sebelum Diskon</label>
+                    <span class="price-before-discount mt-1 block w-full bg-gray-200 rounded-md p-2.5 text-gray-800 font-semibold text-center">Rp 0.00</span>
+                </div>
+
+                 <!-- Jumlah Diskon -->
+                <div class="w-56 min-w-[120px]">
+                    <label class="block text-sm font-medium text-gray-700">Total Diskon</label>
+                    <span class="price-total-discount mt-1 block w-full bg-yellow-100 rounded-md p-2.5 text-yellow-800 font-semibold text-center">Rp 0.00</span>
+                </div>
+
+
+                <!-- Harga Setelah Diskon -->
+                <div class="w-56 min-w-[120px]">
+                    <label class="block text-sm font-medium text-gray-700">Harga Setelah Diskon</label>
+                    <span class="price-after-discount mt-1 block w-full bg-green-100 rounded-md p-2.5 text-green-800 font-semibold text-center">Rp 0.00</span>
+                </div>
+
+                <!-- Remove Button -->
+                <div class="w-10 min-w-[40px] flex justify-center items-end h-full mt-auto">
+                    <button type="button" class="remove-row-btn p-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            `;
+        itemRowsContainer.appendChild(newRow);
+
+        // Tambahkan event listeners untuk elemen di baris baru
+        const quantityInput = newRow.querySelector(".item-quantity");
+        const priceInput = newRow.querySelector(".item-price"); // Input harga
+        const discountTypeSelect = newRow.querySelector(".discount-type");
+        const discountValueInput = newRow.querySelector(".discount-value");
+        const removeBtn = newRow.querySelector(".remove-row-btn");
+
+        // --- Event listener baru untuk input harga ---
+        priceInput.addEventListener("input", (event) => {
+          let value = event.target.value.replace(/[^0-9]/g, ""); // Hapus semua non-digit
+          event.target.value = formatCurrencyInput(value); // Format saat mengetik
+          calculateRowTotal(newRow); // Hitung ulang total
+        });
+        priceInput.addEventListener("blur", (event) => {
+          let value = cleanCurrency(event.target.value); // Bersihkan untuk perhitungan
+          event.target.value = formatCurrency(value); // Format penuh saat blur
+          calculateRowTotal(newRow);
+        });
+        // --- Akhir event listener baru ---
+
+        // Hitung ulang total baris saat input lain berubah
+        [quantityInput, discountTypeSelect, discountValueInput].forEach(
+          (input) => {
+            input.addEventListener("input", () => calculateRowTotal(newRow));
+            input.addEventListener("change", () => calculateRowTotal(newRow)); // Untuk select
+          }
+        );
+
+        // Hapus baris saat tombol remove diklik
+        removeBtn.addEventListener("click", () => {
+          if (itemRowsContainer.children.length > 1) {
+            // Pastikan setidaknya ada 1 baris tersisa
+            newRow.remove();
+            updateGrandTotals(); // Perbarui total setelah menghapus baris
+          } else {
+            showCustomAlert(
+              "Tidak bisa menghapus semua baris. Setidaknya harus ada satu barang."
+            );
+          }
+        });
+
+        // Set nilai awal dan format
+        priceInput.value = formatCurrency(0); // Set nilai awal 0 dengan format
+        calculateRowTotal(newRow); // Hitung total awal untuk baris baru
+      }
+
+      /**
+       * Memformat input numerik saat diketik untuk menampilkan ribuan separator.
+       * @param {string} value - Nilai string dari input.
+       * @returns {string} String yang sudah diformat.
+       */
+      function formatCurrencyInput(value) {
+        // Hapus semua karakter non-digit kecuali tanda koma/titik jika ada
+        let cleanValue = value.replace(/[^0-9]/g, "");
+        if (cleanValue === "") return "";
+
+        // Konversi ke angka, lalu format sebagai string IDR tanpa simbol dan desimal
+        let numberValue = parseInt(cleanValue, 10);
+        if (isNaN(numberValue)) return "";
+
+        // Gunakan Intl.NumberFormat untuk format ribuan
+        return new Intl.NumberFormat("id-ID").format(numberValue);
+      }
+
+      /**
+       * Menghitung total untuk satu baris item dan memperbarui tampilannya.
+       * @param {HTMLElement} rowElement - Elemen DOM dari baris item.
+       */
+      function calculateRowTotal(rowElement) {
+        const quantity =
+          parseFloat(rowElement.querySelector(".item-quantity").value) || 0;
+        // Ambil nilai harga dari input, bersihkan dulu dari format mata uang
+        const price = cleanCurrency(
+          rowElement.querySelector(".item-price").value
+        );
+
+        const discountType = rowElement.querySelector(".discount-type").value;
+        const discountValue =
+          parseFloat(rowElement.querySelector(".discount-value").value) || 0;
+
+        const priceBeforeDiscountSpan = rowElement.querySelector(
+          ".price-before-discount"
+        );
+        const priceTotalDiscountSpan = rowElement.querySelector(
+          ".price-total-discount"
+        ); // Added this line
+        const priceAfterDiscountSpan = rowElement.querySelector(
+          ".price-after-discount"
+        );
+        const discountValueInput = rowElement.querySelector(".discount-value");
+
+        let totalBeforeDiscount = quantity * price;
+        let totalAfterDiscount = totalBeforeDiscount;
+        let totalHargaDiscount = 0; // Initialize totalHargaDiscount
+
+        // Atur visibilitas dan label nilai diskon
+        if (discountType === "none") {
+          discountValueInput.value = 0;
+          discountValueInput.setAttribute("disabled", "true");
+          discountValueInput.classList.add("bg-gray-200");
+        } else {
+          discountValueInput.removeAttribute("disabled");
+          discountValueInput.classList.remove("bg-gray-200");
+          if (discountType === "percentage") {
+            // Pastikan diskon persen tidak negatif atau lebih dari 100
+            if (discountValue < 0) {
+              discountValueInput.value = 0;
+              showCustomAlert("Nilai diskon persen tidak boleh negatif.");
+            } else if (discountValue > 100) {
+              discountValueInput.value = 100;
+              showCustomAlert(
+                "Nilai diskon persen tidak boleh lebih dari 100."
+              );
+            }
+            totalAfterDiscount =
+              totalBeforeDiscount * (1 - discountValue / 100);
+            totalHargaDiscount = totalBeforeDiscount - totalAfterDiscount; // Calculate discount amount
+          } else if (discountType === "fixed") {
+            // Pastikan diskon fixed tidak negatif
+            if (discountValue < 0) {
+              discountValueInput.value = 0;
+              showCustomAlert("Nilai diskon fixed tidak boleh negatif.");
+            }
+            totalAfterDiscount = totalBeforeDiscount - discountValue;
+            totalHargaDiscount = totalBeforeDiscount - totalAfterDiscount; // Calculate discount amount
+          }
+        }
+
+        // Pastikan total setelah diskon tidak kurang dari nol
+        if (totalAfterDiscount < 0) {
+          totalAfterDiscount = 0;
+        }
+
+        priceBeforeDiscountSpan.textContent =
+          formatCurrency(totalBeforeDiscount);
+        priceAfterDiscountSpan.textContent = formatCurrency(totalAfterDiscount);
+        priceTotalDiscountSpan.textContent = formatCurrency(totalHargaDiscount); // Update total discount for the row
+
+        updateGrandTotals(); // Perbarui total keseluruhan setelah setiap baris dihitung
+      }
+
+      /**
+       * Memperbarui total keseluruhan (sebelum dan setelah diskon) dari semua baris item.
+       */
+      function updateGrandTotals() {
+        let totalBeforeAllDiscounts = 0;
+        let totalAfterAllDiscounts = 0;
+        let totalDiscount = 0; // Added this line
+
+        document.querySelectorAll(".item-row").forEach((rowElement) => {
+          const totalBeforeDiscountText = rowElement.querySelector(
+            ".price-before-discount"
+          ).textContent;
+          const totalAfterDiscountText = rowElement.querySelector(
+            ".price-after-discount"
+          ).textContent;
+          const totalDiscountText = rowElement.querySelector(
+            ".price-total-discount"
+          ).textContent; // Added this line
+
+          // Gunakan cleanCurrency untuk mengekstrak angka dari string mata uang
+          const beforeValue = cleanCurrency(totalBeforeDiscountText);
+          const afterValue = cleanCurrency(totalAfterDiscountText);
+          const totalDiscountValue = cleanCurrency(totalDiscountText); // Added this line
+
+          totalBeforeAllDiscounts += beforeValue;
+          totalAfterAllDiscounts += afterValue;
+          totalDiscount += totalDiscountValue; // Accumulate total discount
+        });
+
+        grandTotalBeforeDiscountSpan.textContent = formatCurrency(
+          totalBeforeAllDiscounts
+        );
+        grandTotalAfterDiscountSpan.textContent = formatCurrency(
+          totalAfterAllDiscounts
+        );
+        grandTotalDiscount.textContent = "-" + formatCurrency(totalDiscount); // Update grand total discount
+      }
+
+      // --- Inisialisasi Aplikasi ---
+      document.addEventListener("DOMContentLoaded", () => {
+        // Tambahkan 3 baris default saat aplikasi dimuat
+        for (let i = 0; i < 3; i++) {
+          addRow();
+        }
+        updateGrandTotals(); // Pastikan total dihitung setelah baris awal ditambahkan
+
+        // Event listener untuk tombol "Tambah Barang"
+        addRowBtn.addEventListener("click", addRow);
+      });
+    </script>
+  </body>
+</html>
